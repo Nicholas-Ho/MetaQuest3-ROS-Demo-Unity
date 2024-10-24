@@ -7358,7 +7358,7 @@ MonoBehaviour:
   box2Mass: 1
   springConstant: 50
   damperConstant: 0.5
-  equilibriumSpringLength: 0.3
+  equilibriumSpringLength: 0
 --- !u!1 &640238350
 GameObject:
   m_ObjectHideFlags: 0
