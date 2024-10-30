@@ -3381,7 +3381,7 @@ Transform:
   m_GameObject: {fileID: 337291344}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -0.71648127, y: 0.30409974, z: -0.7764009}
+  m_LocalPosition: {x: 0.2, y: 1, z: 0.5}
   m_LocalScale: {x: 0.1, y: 0.1, z: 0.1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -7330,7 +7330,7 @@ Transform:
   m_GameObject: {fileID: 638883953}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0.5164813, y: 0.69590026, z: 1.2764009}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -7353,11 +7353,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   box1: {fileID: 2000270305}
   box2: {fileID: 337291350}
-  simulationTimeDelta: 0.05
   box1Mass: 1
   box2Mass: 1
   springConstant: 50
-  damperConstant: 0.5
+  damperConstant: 10
   equilibriumSpringLength: 0.3
 --- !u!1 &640238350
 GameObject:
@@ -18655,7 +18654,7 @@ Transform:
   m_GameObject: {fileID: 1789227198}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: 0.7071068, z: -0, w: 0.7071068}
-  m_LocalPosition: {x: -0.5164813, y: 0.30409974, z: -0.7764009}
+  m_LocalPosition: {x: 0, y: 1, z: 0.5}
   m_LocalScale: {x: 1, y: 1, z: 0.20000002}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -20241,7 +20240,7 @@ Transform:
   m_GameObject: {fileID: 2000270299}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -0.3164813, y: 0.30409974, z: -0.7764009}
+  m_LocalPosition: {x: -0.2, y: 1, z: 0.5}
   m_LocalScale: {x: 0.1, y: 0.1, z: 0.1}
   m_ConstrainProportionsScale: 0
   m_Children:

@@ -6,95 +6,103 @@ using RosMessageTypes.Geometry;
 using RosMessageTypes.SpringBoxes;
 using System.Runtime.CompilerServices;
 using Unity.Mathematics;
+using Oculus.Platform;
+
+enum SystemStatus
+{
+    Inactive,
+    Active
+}
+
+// Utility class encapsulating data about boxes
+[System.Serializable]
+public class BoxParams {
+    public Transform transform;
+    public float mass = 1;
+    private string rosId;
+    private string rosTopic;
+    private Vector3 position;
+
+    // Getters and Setters
+    public string id { get=>rosId; }
+    public string subTopicName { get=>rosTopic; }
+    public Vector3 lastUpdatedPos {get=>position; set=>position=value;}
+
+    // Constructor
+    public BoxParams(string id, string topic) { rosId=id; rosTopic=topic; }
+
+    // Utility
+    public bool isGrabbed() {
+        return transform
+            .GetChild(0)
+            .gameObject
+            .GetComponent<GrabFreeTransformerEventBool>()
+            .isGrabbed();
+    }
+}
 
 public class SystemScript : MonoBehaviour
 {
     ROSConnection ros;
 
-    public Transform box1, box2;
-    public float simulationTimeDelta = 0.1f;
-    public float box1Mass = 1, box2Mass = 1;
+    // Physics
+    public BoxParams box1 = new BoxParams("box1", "box1/box_state");
+    public BoxParams box2 = new BoxParams("box2", "box2/box_state");
     public float springConstant = 50, damperConstant = 0.5f, equilibriumSpringLength = 0.3f;
 
-    private string odeServiceName = "spring_ode_solver";
-    private Vector3 box1Curr, box2Curr;
-    private bool initialised = false;
+    // Mapping IDs to BoxParams
+    private Dictionary<string, BoxParams> idBoxMap = new Dictionary<string, BoxParams>();
 
-    void Awake()
-    {
-        Time.fixedDeltaTime = simulationTimeDelta;
-    }
+    // ROS setup
+    private string pubTopicName = "unity_updates";
+    private SystemStatus systemStatus = SystemStatus.Inactive;
 
     // Start is called before the first frame update
     void Start()
     {
         // Start the ROS connection
         ros = ROSConnection.GetOrCreateInstance();
-        ros.RegisterRosService<SpringOdeSolverRequest, SpringOdeSolverResponse>(odeServiceName);
-
-        // Initialise service
-        SpringOdeSolverRequest request = new SpringOdeSolverRequest();
-        request.simState = 0;  // Reset
-        request.timeDelta = simulationTimeDelta;
-        request.spring_constant = springConstant;
-        request.damper_constant = damperConstant;
-        request.equil_spring_length = equilibriumSpringLength;
-        request.obj1mass = box1Mass;
-        request.obj2mass = box2Mass;
-        request.obj1update = true;
-        request.obj2update = true;
-        request.obj1initial = Vector3ToPointMsg(box1.position);
-        request.obj2initial = Vector3ToPointMsg(box2.position);
-        ros.SendServiceMessage<SpringOdeSolverResponse>(odeServiceName, request, (r) => { initialised = true; });
-
-        box1Curr = box1.position;
-        box2Curr = box2.position;
+        ros.Subscribe<ObjectStateMsg>(box1.subTopicName, SubscribeCallback);
+        ros.Subscribe<ObjectStateMsg>(box2.subTopicName, SubscribeCallback);
+        ros.RegisterPublisher<UnityUpdateMsg>(pubTopicName);
     }
 
     // Update is called once per frame
-    void FixedUpdate()
+    void Update()
     {
-        if (!initialised) return;  // Wait for initialisation
+        if (systemStatus == SystemStatus.Inactive) { Initialise(); }
+        if (systemStatus != SystemStatus.Active) return;  // Wait for initialisation
 
-        // Check if grabbed
-        bool box1grabbed = box1
-            .GetChild(0)
-            .gameObject
-            .GetComponent<GrabFreeTransformerEventBool>()
-            .isGrabbed();
-        bool box2grabbed = box2
-            .GetChild(0)
-            .gameObject
-            .GetComponent<GrabFreeTransformerEventBool>()
-            .isGrabbed();
-
-        if (box1grabbed) {
-            box1Curr = box1.position;
+        // Check if grabbed and update states accordingly
+        if (box1.isGrabbed()) {
+            box1.lastUpdatedPos = box1.transform.position;
         } else {
-            box1.position = box1Curr;
+            box1.transform.position = box1.lastUpdatedPos;
         }
-        if (box2grabbed) {
-            box2Curr = box2.position;
+        if (box2.isGrabbed()) {
+            box2.lastUpdatedPos = box2.transform.position;
         } else {
-            box2.position = box2Curr;
+            box2.transform.position = box2.lastUpdatedPos;
         }
 
         // Prepare message
-        SpringOdeSolverRequest request = new SpringOdeSolverRequest();
-        request.timeDelta = simulationTimeDelta;
-        request.simState = 1;
-        request.spring_constant = springConstant;
-        request.damper_constant = damperConstant;
-        request.equil_spring_length = equilibriumSpringLength;
-        request.obj1mass = box1Mass;
-        request.obj2mass = box2Mass;
-        request.obj1update = !box1grabbed;  // If currently grabbed, don't update in solver
-        request.obj2update = !box2grabbed;
-        request.obj1initial = Vector3ToPointMsg(box1Curr);
-        request.obj2initial = Vector3ToPointMsg(box2Curr);
+         UnityUpdateMsg msg = new UnityUpdateMsg(
+            1,  // Running
+            new UnityObjDataMsg[2] {
+                new UnityObjDataMsg(box1.id,
+                                    !box1.isGrabbed(),  // If currently grabbed, don't update in solver
+                                    Vector3ToPointMsg(box1.transform.position),
+                                    box1.mass),
+                new UnityObjDataMsg(box2.id,
+                                    !box2.isGrabbed(),
+                                    Vector3ToPointMsg(box2.transform.position),
+                                    box2.mass),
+            },
+            new SystemParamsMsg(springConstant, damperConstant, equilibriumSpringLength),
+            Time.deltaTime
+        );
 
-        // Service call
-        ros.SendServiceMessage<SpringOdeSolverResponse>(odeServiceName, request, ServiceCallback);
+        ros.Publish(pubTopicName, msg);
     }
 
     void OnDestroy()
@@ -107,27 +115,65 @@ public class SystemScript : MonoBehaviour
         SendTerminate();
     }
 
-    void SendTerminate()
+    void Initialise()
     {
-        SpringOdeSolverRequest request = new SpringOdeSolverRequest();
-        request.simState = 2;  // Terminate
-        request.timeDelta = simulationTimeDelta;
-        request.spring_constant = springConstant;
-        request.damper_constant = damperConstant;
-        request.equil_spring_length = equilibriumSpringLength;
-        request.obj1mass = box1Mass;
-        request.obj2mass = box2Mass;
-        request.obj1update = false;
-        request.obj2update = false;
-        request.obj1initial = Vector3ToPointMsg(box1.position);
-        request.obj2initial = Vector3ToPointMsg(box2.position);
-        ros.SendServiceMessage<SpringOdeSolverResponse>(odeServiceName, request, (r) => {});
+        UnityUpdateMsg msg = new UnityUpdateMsg(
+            0,  // Reset
+            new UnityObjDataMsg[2] {
+                new UnityObjDataMsg(box1.id,
+                                    true,
+                                    Vector3ToPointMsg(box1.transform.position),
+                                    box1.mass),
+                new UnityObjDataMsg(box2.id,
+                                    true,
+                                    Vector3ToPointMsg(box2.transform.position),
+                                    box2.mass),
+            },
+            new SystemParamsMsg(springConstant, damperConstant, equilibriumSpringLength),
+            1  // Placeholder, should not matter
+        );
+
+        ros.Publish(pubTopicName, msg);
+
+        box1.lastUpdatedPos = box1.transform.position;
+        box2.lastUpdatedPos = box2.transform.position;
     }
 
-    void ServiceCallback(SpringOdeSolverResponse response)
+    void SendTerminate()
     {
-        box1Curr = PointMsgToVector3(response.obj1final);
-        box2Curr = PointMsgToVector3(response.obj2final);
+         UnityUpdateMsg msg = new UnityUpdateMsg(
+            2,  // Terminate
+            new UnityObjDataMsg[2] {
+                new UnityObjDataMsg(box1.id,
+                                    false,
+                                    Vector3ToPointMsg(box1.transform.position),
+                                    box1.mass),
+                new UnityObjDataMsg(box2.id,
+                                    false,
+                                    Vector3ToPointMsg(box2.transform.position),
+                                    box2.mass),
+            },
+            new SystemParamsMsg(springConstant, damperConstant, equilibriumSpringLength),
+            1  // Placeholder, should not matter
+        );
+
+        ros.Publish(pubTopicName, msg);
+    }
+
+    void SubscribeCallback(ObjectStateMsg response)
+    {
+        BoxParams updatedBox = GetBoxParamsFromId(response.id);
+        updatedBox.lastUpdatedPos = PointMsgToVector3(response.position);
+        systemStatus = SystemStatus.Active;
+    }
+
+    BoxParams GetBoxParamsFromId(string id) {
+        // Lazy initialisation
+        if (idBoxMap.Count == 0) {
+            idBoxMap[box1.id] = box1;
+            idBoxMap[box2.id] = box2;
+        }
+        return idBoxMap[id];
     }
 
     Vector3 PointMsgToVector3(PointMsg msg) {
