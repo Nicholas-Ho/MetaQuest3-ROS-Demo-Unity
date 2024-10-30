@@ -8,33 +8,37 @@ using Unity.Robotics.ROSTCPConnector.MessageGeneration;
 namespace RosMessageTypes.SpringBoxes
 {
     [Serializable]
-    public class BoxDataMsg : Message
+    public class UnityObjDataMsg : Message
     {
-        public const string k_RosMessageName = "spring_boxes/BoxData";
+        public const string k_RosMessageName = "spring_boxes/UnityObjData";
         public override string RosMessageName => k_RosMessageName;
 
+        public string id;
         public bool update;
         public Geometry.PointMsg position;
         public double mass;
 
-        public BoxDataMsg()
+        public UnityObjDataMsg()
         {
+            this.id = "";
             this.update = false;
             this.position = new Geometry.PointMsg();
             this.mass = 0.0;
         }
 
-        public BoxDataMsg(bool update, Geometry.PointMsg position, double mass)
+        public UnityObjDataMsg(string id, bool update, Geometry.PointMsg position, double mass)
         {
+            this.id = id;
             this.update = update;
             this.position = position;
             this.mass = mass;
         }
 
-        public static BoxDataMsg Deserialize(MessageDeserializer deserializer) => new BoxDataMsg(deserializer);
+        public static UnityObjDataMsg Deserialize(MessageDeserializer deserializer) => new UnityObjDataMsg(deserializer);
 
-        private BoxDataMsg(MessageDeserializer deserializer)
+        private UnityObjDataMsg(MessageDeserializer deserializer)
         {
+            deserializer.Read(out this.id);
             deserializer.Read(out this.update);
             this.position = Geometry.PointMsg.Deserialize(deserializer);
             deserializer.Read(out this.mass);
@@ -42,6 +46,7 @@ namespace RosMessageTypes.SpringBoxes
 
         public override void SerializeTo(MessageSerializer serializer)
         {
+            serializer.Write(this.id);
             serializer.Write(this.update);
             serializer.Write(this.position);
             serializer.Write(this.mass);
@@ -49,7 +54,8 @@ namespace RosMessageTypes.SpringBoxes
 
         public override string ToString()
         {
-            return "BoxDataMsg: " +
+            return "UnityObjDataMsg: " +
+            "\nid: " + id.ToString() +
             "\nupdate: " + update.ToString() +
             "\nposition: " + position.ToString() +
             "\nmass: " + mass.ToString();

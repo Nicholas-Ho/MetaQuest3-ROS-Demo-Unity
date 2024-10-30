@@ -14,25 +14,22 @@ namespace RosMessageTypes.SpringBoxes
         public override string RosMessageName => k_RosMessageName;
 
         public int simState;
-        public BoxDataMsg box1data;
-        public BoxDataMsg box2data;
+        public UnityObjDataMsg[] objDataList;
         public SystemParamsMsg systemParams;
         public double timeDelta;
 
         public UnityUpdateMsg()
         {
             this.simState = 0;
-            this.box1data = new BoxDataMsg();
-            this.box2data = new BoxDataMsg();
+            this.objDataList = new UnityObjDataMsg[2];
             this.systemParams = new SystemParamsMsg();
             this.timeDelta = 0.0;
         }
 
-        public UnityUpdateMsg(int simState, BoxDataMsg box1data, BoxDataMsg box2data, SystemParamsMsg systemParams, double timeDelta)
+        public UnityUpdateMsg(int simState, UnityObjDataMsg[] objDataList, SystemParamsMsg systemParams, double timeDelta)
         {
             this.simState = simState;
-            this.box1data = box1data;
-            this.box2data = box2data;
+            this.objDataList = objDataList;
             this.systemParams = systemParams;
             this.timeDelta = timeDelta;
         }
@@ -42,8 +39,7 @@ namespace RosMessageTypes.SpringBoxes
         private UnityUpdateMsg(MessageDeserializer deserializer)
         {
             deserializer.Read(out this.simState);
-            this.box1data = BoxDataMsg.Deserialize(deserializer);
-            this.box2data = BoxDataMsg.Deserialize(deserializer);
+            deserializer.Read(out this.objDataList, UnityObjDataMsg.Deserialize, 2);
             this.systemParams = SystemParamsMsg.Deserialize(deserializer);
             deserializer.Read(out this.timeDelta);
         }
@@ -51,8 +47,7 @@ namespace RosMessageTypes.SpringBoxes
         public override void SerializeTo(MessageSerializer serializer)
         {
             serializer.Write(this.simState);
-            serializer.Write(this.box1data);
-            serializer.Write(this.box2data);
+            serializer.Write(this.objDataList);
             serializer.Write(this.systemParams);
             serializer.Write(this.timeDelta);
         }
@@ -61,8 +56,7 @@ namespace RosMessageTypes.SpringBoxes
         {
             return "UnityUpdateMsg: " +
             "\nsimState: " + simState.ToString() +
-            "\nbox1data: " + box1data.ToString() +
-            "\nbox2data: " + box2data.ToString() +
+            "\nobjDataList: " + System.String.Join(", ", objDataList.ToList()) +
             "\nsystemParams: " + systemParams.ToString() +
             "\ntimeDelta: " + timeDelta.ToString();
         }
